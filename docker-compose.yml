@@ -1,0 +1,114 @@
+version: "3.8"
+
+services:
+  # PEP Proxy for Orion
+  wilma-pep-proxy:
+    labels:
+      org.fiware: 'saiafarm'
+    image: quay.io/fiware/pep-proxy:${WILMA_VERSION}
+    container_name: fiware-wilma-proxy
+    hostname: wilma-proxy
+    networks:
+      default:
+        ipv4_address: 172.18.1.10
+    depends_on:
+      keyrock:
+        condition: service_started
+    deploy:
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "${WILMA_PROXY_PORT}:${WILMA_PROXY_PORT}" # wilma pep proxy port
+    expose:
+      - "${WILMA_PROXY_PORT}" # wilma pep proxy port
+    environment:
+      - DEBUG=pep-proxy:*
+      - PEP_PROXY_DEBUG=true
+      - PEP_PROXY_APP_HOST=host.docker.internal
+      - PEP_PROXY_APP_PORT=${SAIA_BACKEND_PORT}
+      - PEP_PROXY_PORT=${WILMA_PROXY_PORT}
+      - PEP_PROXY_IDM_HOST=keyrock
+      - PEP_PROXY_HTTPS_ENABLED=false
+      - PEP_PROXY_AUTH_ENABLED=true
+      - PEP_PROXY_IDM_SSL_ENABLED=false
+      - PEP_PROXY_IDM_PORT=${KEYROCK_PORT}
+      - PEP_PROXY_APP_ID=c3d09d7c-7edd-446c-8890-be1df26942b9
+      - PEP_PROXY_USERNAME=pep_proxy_8bc34207-84e9-4228-93eb-4d83900216b3
+      - PEP_PASSWORD=pep_proxy_eeb6c165-98fc-42ba-a8f0-bec59678ab9e
+      - PEP_PROXY_PDP=idm
+      - PEP_PROXY_MAGIC_KEY=1234
+      - PEP_PROXY_PUBLIC_PATHS=/version
+    healthcheck:
+      interval: 50s
+
+  # Keyrock is an Identity Management Front-End
+  keyrock:
+    labels:
+      org.fiware: 'saiafarm'
+    image: quay.io/fiware/idm:${KEYROCK_VERSION}
+    container_name: fiware-keyrock
+    hostname: keyrock
+    networks:
+      default:
+        ipv4_address: 172.18.1.5
+    depends_on:
+      - mysql-db
+    ports:
+      - "${KEYROCK_PORT}:${KEYROCK_PORT}" # localhost:3005
+      - "${KEYROCK_HTTPS_PORT}:${KEYROCK_HTTPS_PORT}" # localhost:3443
+    environment:
+      - "DEBUG=idm:*"
+      - "IDM_DB_HOST=mysql-db"
+      - "IDM_DB_PASS_FILE=/run/secrets/my_secret_data"
+      - "IDM_DB_USER=root"
+      - "IDM_HOST=http://localhost:${KEYROCK_PORT}"
+      - "IDM_PORT=${KEYROCK_PORT}"
+      - "IDM_HTTPS_ENABLED=${IDM_HTTPS_ENABLED}"
+      - "IDM_HTTPS_PORT=${KEYROCK_HTTPS_PORT}"
+      - "IDM_ADMIN_USER=admin"
+      - "IDM_ADMIN_EMAIL=admin@test.com"
+      - "IDM_ADMIN_PASS=1234"
+      - "IDM_CSP_FORM_ACTION=*"
+    secrets:
+      - my_secret_data
+    healthcheck:
+      interval: 5s
+
+  # keyrock sql-db
+  mysql-db:
+    restart: always
+    labels:
+      org.fiware: 'saiafarm'
+    image: mysql:${MYSQL_DB_VERSION}
+    hostname: mysql-db
+    container_name: db-mysql
+    expose:
+      - "${MYSQL_DB_PORT}"
+    ports:
+      - "${MYSQL_HOST_PORT}:${MYSQL_DB_PORT}" # localhost:3306
+    networks:
+      default:
+        ipv4_address: 172.18.1.6
+    environment:
+      - "MYSQL_ROOT_PASSWORD_FILE=/run/secrets/my_secret_data"
+      - "MYSQL_ROOT_HOST=172.18.1.5" # Allow Keyrock to access this database
+    volumes:
+      - mysql-db:/var/lib/mysql
+      # - ../mysql-data:/docker-entrypoint-initdb.d/:ro # preload Keyrock users
+    secrets:
+      - my_secret_data
+
+networks:
+  default:
+    labels:
+      org.fiware: 'saiafarm'
+    ipam:
+      config:
+        - subnet: 172.18.1.0/24
+
+volumes:
+  mysql-db: ~
+
+secrets:
+  my_secret_data:
+    file: ../secrets.txt
