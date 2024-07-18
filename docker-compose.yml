@@ -35,8 +35,9 @@ services:
       - PEP_PROXY_USERNAME=${WILMA_USERNAME}
       - PEP_PASSWORD_FILE=/run/secrets/wilma_secret
       - PEP_PROXY_PDP=idm
+      - PEP_PROXY_TOKEN_SECRET=${JWT_SECRET}
       - PEP_PROXY_MAGIC_KEY=1234
-      - PEP_PROXY_PUBLIC_PATHS=/version
+      - PEP_PROXY_PUBLIC_PATHS=/version,/user/registration,/login
     secrets:
       - wilma_secret
     healthcheck:
