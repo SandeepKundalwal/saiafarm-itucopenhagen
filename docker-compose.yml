@@ -1,14 +1,13 @@
 version: "3.8"
 
 services:
-  wilma-proxy:
+  wilma:
     labels:
       org.fiware: 'saiafarm'
     image: quay.io/fiware/pep-proxy:${WILMA_VERSION}
     container_name: fiware-wilma-proxy
-    hostname: wilma-proxy
     networks:
-      default:
+      fiware-network:
         ipv4_address: 172.18.1.10
     depends_on:
       keyrock:
@@ -41,9 +40,10 @@ services:
       - PEP_PROXY_PDP_PROTOCOL=http
       - PEP_PROXY_PDP_HOST=authzforce
       - PEP_PROXY_PDP_PORT=${AUTHZFORCE_PORT}
-      - PEP_PROXY_TOKEN_SECRET=${JWT_SECRET}
+      - PEP_PROXY_TOKEN_SECRET=/run/secrets/jwt_secret
       - PEP_PROXY_PUBLIC_PATHS=/version,/user/registration,/login
     secrets:
+      - jwt_secret
       - wilma_secret
     healthcheck:
       interval: 50s
@@ -55,18 +55,20 @@ services:
       org.fiware: 'saiafarm'
     image: quay.io/fiware/idm:${KEYROCK_VERSION}
     container_name: fiware-keyrock
-    hostname: keyrock
     networks:
-      default:
+      fiware-network:
         ipv4_address: 172.18.1.5
     depends_on:
-      - authzforce
+      mysql:
+        condition: service_started
+      authzforce:
+        condition: service_started
     ports:
       - "${KEYROCK_PORT}:${KEYROCK_PORT}" # localhost:3005
       - "${KEYROCK_HTTPS_PORT}:${KEYROCK_HTTPS_PORT}" # localhost:3443
     environment:
       - DEBUG=idm:*
-      - IDM_DB_HOST=mysql-db
+      - IDM_DB_HOST=mysql
       - IDM_DB_USER=root
       - IDM_DB_PASS_FILE=/run/secrets/mysql_secret
       - IDM_DB_NAME=idm
@@ -74,9 +76,9 @@ services:
       - IDM_PORT=${KEYROCK_PORT}
       - IDM_HTTPS_ENABLED=${IDM_HTTPS_ENABLED}
       - IDM_HTTPS_PORT=${KEYROCK_HTTPS_PORT}
-      - IDM_ADMIN_USER=alice
-      - IDM_ADMIN_EMAIL=alice-the-admin@test.com
-      - IDM_ADMIN_PASS=test
+      # - IDM_ADMIN_USER=saiafarm
+      # - IDM_ADMIN_EMAIL=sandeepkundalwal96@gmail.com
+      # - IDM_ADMIN_PASS=saiafarm@itu
       - IDM_PDP_LEVEL=advanced
       - IDM_AUTHZFORCE_ENABLED=true
       - IDM_AUTHZFORCE_HOST=authzforce
@@ -94,7 +96,7 @@ services:
     image: fiware/authzforce-ce-server:release-8.1.0
     container_name: fiware-authzforce
     networks:
-      default:
+      fiware-network:
         ipv4_address: 172.18.1.12
     ports:
       - "${AUTHZFORCE_PORT}:${AUTHZFORCE_PORT}" # localhost:8080
@@ -106,19 +108,18 @@ services:
     healthcheck:
       test: curl --fail -s http://authzforce:${AUTHZFORCE_PORT}/authzforce-ce/version || exit 1
     
-  mysql-db:
+  mysql:
     restart: always
     labels:
       org.fiware: 'saiafarm'
     image: mysql:${MYSQL_DB_VERSION}
-    hostname: mysql-db
-    container_name: db-mysql
+    container_name: mysql-db
     expose:
       - "${MYSQL_DB_PORT}"
     ports:
       - "${MYSQL_HOST_PORT}:${MYSQL_DB_PORT}" # localhost:3306
     networks:
-      default:
+      fiware-network:
         ipv4_address: 172.18.1.6
     environment:
       - "MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_secret"
@@ -130,7 +131,7 @@ services:
       - mysql_secret
 
 networks:
-  default:
+  fiware-network:
     labels:
       org.fiware: 'saiafarm'
     ipam:
@@ -142,5 +143,7 @@ secrets:
     file: ./mysql-secret.txt
   keyrock_secret:
     file: ./keyrock-secret.txt
+  jwt_secret:
+    file: ./jwt-secret.txt
   wilma_secret:
     file: ./wilma-secret.txt
