@@ -40,7 +40,7 @@ services:
       - PEP_PROXY_PDP_PROTOCOL=http
       - PEP_PROXY_PDP_HOST=authzforce
       - PEP_PROXY_PDP_PORT=${AUTHZFORCE_PORT}
-      - PEP_PROXY_TOKEN_SECRET=/run/secrets/jwt_secret
+      - PEP_PROXY_TOKEN_SECRET_FILE=/run/secrets/jwt_secret
       - PEP_PROXY_PUBLIC_PATHS=/version,/user/registration,/login
     secrets:
       - jwt_secret
